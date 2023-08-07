@@ -1,0 +1,17 @@
+service: hello-world
+
+provider:
+  name: aws
+  runtime: python3.8
+
+functions:
+  hello-world:
+    handler: python_handler.hello
+    events:
+      - http:
+          path: hello
+          method: GET
+
+plugins:
+  - serverless-offline
+w

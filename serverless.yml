@@ -1,0 +1,135 @@
+org: marcelobarba10
+app: crud-serverless-users
+service: crud-serverless-users
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action: "dynamodb:*"
+          Resource: arn:aws:dynamodb:us-east-1:481390544604:table/usersTable
+
+plugins:
+  - serverless-offline
+  - serverless-dynamodb
+
+package:
+  individually: true
+  patterns:
+    - "!*/**"
+
+custom:
+  dynamodb:
+    # If you only want to use DynamoDB Local in some stages, declare them here
+    stages:
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+    # Uncomment only if you already have a DynamoDB running locally
+    # noStart: true
+
+functions:
+  get-users:
+    handler: getusers/python_handler.get_users
+    runtime: python3.8
+    package:
+      patterns:
+        - "getusers/python_handler.py"
+    events:
+      - http:
+          path: users/{id}
+          method: GET
+          request:
+            parameters:
+              paths:
+                id: true
+  create-users:
+    handler: createUsers/python_handler.create_users
+    runtime: python3.8
+    package:
+      patterns:
+        - "createUsers/python_handler.py"
+    events:
+      - http:
+          path: users
+          method: POST
+          request:
+            schemas:
+              application/json: ${file(schemas/user-schema.json)}
+  update-users:
+    handler: updateUsers/python_handler.update_users
+    runtime: python3.8
+    package:
+      patterns:
+        - "updateUsers/python_handler.py"
+    events:
+      - http:
+          path: users/{id}
+          method: PATCH
+          request:
+            parameters:
+              paths:
+                id: true
+            schemas:
+              application/json: ${file(schemas/user-schema.json)}
+  delete-users:
+    handler: deleteUsers/handler.deleteUsers
+    runtime: python3.8
+    package:
+      patterns:
+        - "deleteUsers/handler.py"
+    events:
+      - http:
+          path: users/{id}
+          method: DELETE
+          request:
+            parameters:
+              paths:
+                id: true
+
+resources:
+  Resources:
+    usersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: usersTable
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    S3Bucket:
+      Type: "AWS::S3::Bucket"
+      Properties:
+        # AccessControl: PublicRead
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+        OwnershipControls:
+          Rules:
+            - ObjectOwnership: ObjectWriter
+        BucketName: bucket-serverless-python-mbc
+    SampleBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref S3Bucket
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Action:
+                - "s3:GetObject"
+              Effect: Allow
+              Resource: !Join
+                - ""
+                - - "arn:aws:s3:::"
+                  - !Ref S3Bucket
+                  - /*
+              Principal: "*"
